@@ -2,7 +2,6 @@
 
 LeanDojo-v2 is an end-to-end framework for training, evaluating, and deploying AI-assisted theorem provers for Lean 4. It combines repository tracing, lifelong dataset management, retrieval-augmented agents, Hugging Face fine-tuning, and external inference APIs into one toolkit.
 
----
 
 ## Table of Contents
 
@@ -22,7 +21,6 @@ LeanDojo-v2 is an end-to-end framework for training, evaluating, and deploying A
 14. [Contributing](#contributing)
 15. [License](#license)
 
----
 
 ## Overview
 
@@ -36,7 +34,6 @@ LeanDojo-v2 extends the original LeanDojo stack with the LeanAgent lifelong lear
 
 The codebase is modular: you can reuse the tracing pipeline without the agents, swap in custom trainers, or stand up your own inference service via the external API layer.
 
----
 
 ## Key Features
 
@@ -47,7 +44,6 @@ The codebase is modular: you can reuse the tracing pipeline without the agents, 
 - **Dynamic Repository Database**: `database` tracks repositories, theorems, curriculum difficulty, and sorry status, enabling lifelong training schedules.
 - **External API**: The `external_api` folder exposes HTTP endpoints (FastAPI + uvicorn) and Lean frontend snippets so you can query LLMs from Lean editors.
 
----
 
 ## Repository Layout
 
@@ -64,7 +60,6 @@ The codebase is modular: you can reuse the tracing pipeline without the agents, 
 
 For deeper documentation on the lifelong learning component, see `lean_dojo_v2/lean_agent/README.md`.
 
----
 
 ## Requirements
 
@@ -76,7 +71,6 @@ For deeper documentation on the lifelong learning component, see `lean_dojo_v2/l
 
 Python dependencies are declared in `pyproject.toml` and include PyTorch, PyTorch Lightning, Transformers, DeepSpeed, TRL, PEFT, and more.
 
----
 
 ## Installation
 
@@ -108,7 +102,6 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 
 > Tip: You can use [uv](https://github.com/astral-sh/uv) (`uv pip install lean-dojo-v2`) as an alternative Python package manager.
 
----
 
 ## Environment Setup
 
@@ -131,7 +124,6 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 4. **Lean toolchains**  
    Ensure `elan` is configured and Lean 4 (e.g., `leanprover/lean4:nightly`) is available on your `$PATH`. The tracing scripts look under `~/.elan/toolchains/`.
 
----
 
 ## Quick Start
 
@@ -183,7 +175,7 @@ commit = "005de00d03f1aaa32cb2923d5e3cbaf0b954a192"
 
 database = DynamicDatabase()
 
-database.setup_github_repository(
+database.trace_repository(
     url=url,
     commit=commit,
     build_deps=False,
@@ -350,7 +342,6 @@ pytest -v
 - **Dataset location**: The default `raid/` directory can grow large. Point it to high-throughput storage or use symlinks.
 - **Pantograph errors**: Reinstall Pantograph from source (`pip install git+https://github.com/stanford-centaur/PyPantograph`) whenever Lean upstream changes.
 
----
 
 ## Contributing
 
@@ -359,8 +350,6 @@ Issues and pull requests are welcome! Please:
 1. Open an issue describing the bug or feature.
 2. Run formatters (`black`, `isort`) and `pytest` before submitting.
 3. Mention if your change touches Lean tracing files so reviewers can re-generate artifacts.
-
----
 
 ## License
 
