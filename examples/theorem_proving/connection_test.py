@@ -4,6 +4,21 @@ from lean_dojo_v2.database import DynamicDatabase
 from collections import deque
 import json
 
+
+def build_so_tactic(
+    close: list[str] = None,   # no-arg: constructor, trivial, rfl
+    hyp:   list[str] = None,   # local-decl: apply, exact, cases
+    var:   list[str] = None,   # fresh-var: intro, rintro
+    func:  list[str] = None,   # apply congrArg <f>: Nat.succ, etc.
+) -> str:
+    config = {}
+    if close: config["close"] = close
+    if hyp:   config["hyp"]   = hyp
+    if var:   config["var"]   = var
+    if func:  config["func"]  = func
+    inner = json.dumps(config).replace('"', '\\"')
+    return f'so "{inner}"'
+
 """
 Curriculum Theorem Prover
 
@@ -16,7 +31,7 @@ Flow:
 """
 
 theorems_path = "/Users/nelsmartin/Lean/RL-Testbed"
-commit = "fb4f3b0048d6c1e6b297da7becb08e2e8090e687"
+commit = "4de4d162bc17cf0a530487a471e780457be55849"
 
 
 def load_theorems(path, commit):
@@ -49,17 +64,17 @@ def extract_theorem_list(db_dict):
     return [(name, stmt) for name, stmt, _ in theorems]
 
 
-def get_candidate_tactics(server, state, proved_theorems):
-    """Get candidate tactics by combining 'so' tactic suggestions with
+def get_candidate_tactics(server, state, proved_theorems, oracle_tactic):
+    """Get candidate tactics from the parameterized oracle plus
     apply calls for previously proved theorems.
 
     Returns a list of tactic strings.
     """
     tactics = []
 
-    # Get suggestions from the 'so' tactic
+    # Get suggestions from the parameterized 'so' oracle
     try:
-        suggestion_state = server.goal_tactic(state, "so")
+        suggestion_state = server.goal_tactic(state, oracle_tactic)
         for msg in suggestion_state.messages:
             try:
                 data = json.loads(msg.data)
@@ -77,7 +92,7 @@ def get_candidate_tactics(server, state, proved_theorems):
     return tactics
 
 
-def prove_with_bfs(server, goal_expr, proved_theorems, max_depth=11):
+def prove_with_bfs(server, goal_expr, proved_theorems, oracle_tactic, max_depth=15):
     """Try to prove goal_expr using BFS.
 
     Returns (tactics_list, solved_state) if proved, or None if not.
@@ -96,7 +111,7 @@ def prove_with_bfs(server, goal_expr, proved_theorems, max_depth=11):
         if len(tactics) >= max_depth:
             continue
 
-        candidates = get_candidate_tactics(server, state, proved_theorems)
+        candidates = get_candidate_tactics(server, state, proved_theorems, oracle_tactic)
 
         for tactic in candidates:
             try:
@@ -152,19 +167,31 @@ print(f"Found {len(theorems)} theorems: {[name for name, _ in theorems]}\n")
 print("=== Initializing Pantograph server ===")
 server = Server(
     project_path="/Users/nelsmartin/Lean/RL-Testbed",
-    imports=["Init", "RLTestbed.MyTactic"],
+    imports=["Init", "RLTestbed.ParameterizedTactic"],
 )
 print("Server ready.\n")
 
-proved_theorems = []  # list of theorem names added to the environment
-unsolved = []  # theorems not proved in pass 1
+oracle_tactic = build_so_tactic(
+    close=["constructor"],
+    hyp=["induct_rename", "apply", "cases"],
+    var=["intro"],
+    func=["Nat.succ"],
+)
 
-print("=== Pass 1: Proving theorems in order ===")
+# oracle_tactic = build_so_tactic(
+#     close=["simp"]
+# )
+print(f"Oracle tactic: {oracle_tactic}\n")
+
+proved_theorems = []  # list of theorem names added to the environment
+unsolved = []
+
+print("=== Proving theorems in order ===")
 for name, stmt in theorems:
     goal_expr = goal_expr_from_statement(stmt)
     print(f"Attempting {name}: {goal_expr}")
 
-    result = prove_with_bfs(server, goal_expr, proved_theorems)
+    result = prove_with_bfs(server, goal_expr, proved_theorems, oracle_tactic)
 
     if result:
         tactics, solved_state = result
@@ -172,32 +199,9 @@ for name, stmt in theorems:
         register_proof(server, name, goal_expr, solved_state, proved_theorems)
     else:
         print(f"  Could not prove.")
-        unsolved.append((name, stmt))
+        unsolved.append(name)
 
-print(f"\nPass 1 complete: {len(proved_theorems)} proved, {len(unsolved)} unsolved.\n")
-
-if unsolved:
-    print("=== Pass 2: Retrying unsolved theorems with accumulated lemmas ===")
-    still_unsolved = []
-    for name, stmt in unsolved:
-        goal_expr = goal_expr_from_statement(stmt)
-        print(f"Retrying {name}: {goal_expr}")
-
-        result = prove_with_bfs(server, goal_expr, proved_theorems)
-
-        if result:
-            tactics, solved_state = result
-            print(f"  Proved! Tactics: {tactics}")
-            register_proof(server, name, goal_expr, solved_state, proved_theorems)
-        else:
-            print(f"  Still could not prove.")
-            still_unsolved.append(name)
-
-    print(f"\nPass 2 complete: {len(proved_theorems)} total proved, {len(still_unsolved)} unsolved.\n")
-
-print("=== Summary ===")
+print(f"\n=== Summary ===")
 print(f"Proved: {proved_theorems}")
 if unsolved:
-    remaining = [n for n, _ in unsolved if n not in proved_theorems]
-    if remaining:
-        print(f"Unsolved: {remaining}")
+    print(f"Unsolved: {unsolved}")
